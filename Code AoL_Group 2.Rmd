@@ -1,0 +1,451 @@
+---
+title: "AOL_Data_Mining"
+author: "Rizki,Ascendia,Ireine"
+date: "2024-06-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(plotly)
+```
+
+```{r }
+setwd("D:/BINUS/Semester_4/Data Mining & Vizualize/AOL")
+data <- read.csv("visitor_asean.csv")
+```
+
+```{r}
+#data overview
+str(data)
+head(data)
+
+```
+
+```{r}
+#missing value
+missing_values <- sapply(data, function(x) sum(is.na(x)))
+print("Missing values in each feature:")
+print(missing_values)
+
+```
+
+```{r}
+#data imputation
+
+data_impute <- na.omit(data)
+print("Data Table after dropping rows with missing values:")
+print(data_impute)
+
+missing_values1 <- sapply(data_impute, function(x) sum(is.na(x)))
+print("Missing values in each feature after imputation:")
+print(missing_values1)
+
+```
+
+```{r}
+#Isolate indonesian as the main source destination country.
+library(dplyr)
+# Filter the data to isolate rows where the 'Destination Country' is 'Indonesia'
+indonesia_data1 <- filter(data_impute, `Destination.Country` == "Indonesia")
+indonesia_data <- indonesia_data1[!indonesia_data1$Origin.Country %in% c("Total Intra-ASEAN", "Total Country (World)", "Total EU-27"), ]
+# Print the filtered data
+print(indonesia_data)
+
+# Alternatively, save the filtered data to a new CSV file
+
+
+```
+
+```{r}
+# Reshape the data to a long format
+indonesiaData_long <- indonesia_data %>%
+  pivot_longer(cols = starts_with("X"), names_to = "Year", values_to = "Visitors") %>%
+  mutate(Year = as.numeric(sub("X", "", Year)))
+print(indonesiaData_long)
+
+```
+
+```{r}
+
+# Count the visitors by origin country
+origin_country_counts <- indonesiaData_long %>%
+  group_by(Origin.Country) %>%
+  summarize(TotalVisitors = sum(Visitors, na.rm = TRUE)) %>%
+  arrange(desc(TotalVisitors))
+# Print the counts
+print(origin_country_counts)
+
+# Filter to get the top 10 origin countries
+top_10_origin_countries <- origin_country_counts %>%
+  top_n(10, TotalVisitors)
+
+# Filter the long data for these top 10 origin countries
+indonesia_data_top10 <- indonesiaData_long %>%
+  filter(`Origin.Country` %in% top_10_origin_countries$`Origin.Country`)
+write.csv(indonesia_data_top10, "cambodia_data.csv", row.names = FALSE)
+```
+
+```{r}
+# univariate 
+#Histogram Plot: Menampilkan distribusi jumlah pengunjung Indonesia.
+# Find the smallest and largest values in the Visitors column
+min_visitors <- min(indonesia_data_top10$Visitors)
+max_visitors <- max(indonesia_data_top10$Visitors)
+
+# Adjusted Plot with dynamic xbins
+histogram_plot <- plot_ly(
+  data = indonesia_data_top10, 
+  x = ~Visitors, 
+  type = 'histogram',
+  autobinx = FALSE,
+  xbins = list(start = min_visitors, end = max_visitors, size = 400000),  # Set an appropriate bin size
+  hoverinfo = 'x+y+text',
+  text = ~paste("Year:", Year),
+  marker = list(
+    color = 'rgba(0, 100, 255, 0.7)', 
+    line = list(color = 'rgba(0, 0, 0, 1)', width = 1)
+  )
+) %>%
+  layout(
+    title = list(text = 'Distribution of Total Indonesian Visitors', font = list(size = 24, color = 'darkblue')),
+    xaxis = list(title = 'Number of Visitors', tickangle = -45, tickfont = list(size = 12, color = 'darkblue')),
+    yaxis = list(title = 'Count', tickfont = list(size = 12, color = 'darkblue')),
+    plot_bgcolor = 'rgba(240, 240, 240, 0.9)',
+    paper_bgcolor = 'rgba(255, 255, 255, 1)',
+    margin = list(l = 50, r = 50, b = 100, t = 100, pad = 4)
+  )
+
+# Display the plot
+histogram_plot
+```
+
+```{r}
+#multivarit
+#Heatmap Plot: Menampilkan hubungan antara tahun dan negara asal pengunjung dengan menggunakan heatmap plot.
+
+heatmap_plot <- plot_ly(data = indonesia_data_top10, x = ~Year, y = ~interaction(Origin.Country, Destination.Country), z = ~Visitors, type = 'heatmap', colorscale = 'Viridis') %>%
+  layout(
+    title = list(text = 'Heatmap of Visitors Over Time by Country and Origin', font = list(size = 24, color = 'darkblue')),
+    xaxis = list(title = 'Year', tickangle = -45, tickfont = list(size = 12, color = 'darkblue')),
+    yaxis = list(title = 'Country and Origin', tickfont = list(size = 12, color = 'darkblue')),
+    plot_bgcolor = 'rgba(240, 240, 240, 0.9)',
+    paper_bgcolor = 'rgba(255, 255, 255, 1)',
+    margin = list(l = 50, r = 50, b = 100, t = 100, pad = 4)
+  )
+
+# Display the plot
+heatmap_plot
+
+```
+
+```{r  }
+#univariat
+# Bar plot using plotly
+#Bar Plot: Menampilkan total pengunjung dari top 10 negara asal pengunjung ke Indonesia.
+bar_plot <- plot_ly(top_10_origin_countries, x = ~Origin.Country, y = ~TotalVisitors, type = 'bar', 
+                    marker = list(color = 'blue')) %>%
+  layout(title = 'Total Visitors from Top 10 Origin Countries to Indonesia',
+         xaxis = list(title = 'Origin Country', tickangle = -45),
+         yaxis = list(title = 'Total Visitors'))
+
+bar_plot
+```
+
+```{r}
+# univariat
+# Boxplot Univariat: Menampilkan distribusi jumlah pengunjung Indonesia dengan menggunakan plot boxplot.
+
+box_plot <- plot_ly(indonesia_data_top10, 
+                    x = ~`Origin.Country`, 
+                    y = ~Visitors, 
+                    type = 'box', 
+                    boxpoints = 'all', 
+                    jitter = 0, 
+                    pointpos = 0,
+                    marker = list(color = 'rgba(0, 100, 255, 0.5)'),
+                    line = list(color = 'rgba(255, 0, 0, 0.5)'),
+                    fillcolor = 'rgba(255, 255, 0, 0.5)') %>%
+  layout(title = 'Distribution of Visitors by Top 10 Origin Countries Over Years',
+         xaxis = list(title = 'Origin Country', tickangle = -45),
+         yaxis = list(title = 'Number of Visitors'))
+
+box_plot
+
+```
+
+```{r}
+#univariat
+# Line plot using plotly
+#Line Plot: Menampilkan trend jumlah pengunjung Indonesia per tahun untuk top 10 negara asal pengunjung.
+line_plot <- plot_ly(indonesia_data_top10, x = ~Year, y = ~Visitors, color = ~`Origin.Country`, 
+                     type = 'scatter', mode = 'lines+markers') %>%
+  layout(title = 'Trend of Indonesia Visitors Over Years by Top 10 Origin Countries',
+         xaxis = list(title = 'Year'),
+         yaxis = list(title = 'Number of Visitors'))
+
+line_plot
+
+```
+
+```{r}
+#univariat
+# Grafik violin plot
+#Violin Plot: Menampilkan distribusi jumlah pengunjung Indonesia dengan memperlihatkan kepadatan dan bentuk distribusi.
+violin_plot <- plot_ly(indonesia_data_top10, x = ~Origin.Country, y = ~Visitors, type = 'violin') %>%
+  layout(title = 'Violin Plot of Visitors by Origin Country',
+         xaxis = list(title = 'Origin Country'),
+         yaxis = list(title = 'Number of Visitors'))
+
+violin_plot
+
+```
+
+```{r}
+#univariat (iseng aja)
+# Word Cloud: Menampilkan top 10 negara asal pengunjung dengan menggunakan word cloud.
+# Membuat plot untuk top 10 negara asal pengunjung menggunakan word cloud
+library(wordcloud)
+
+top_10_origin_countries_wordcloud <- indonesia_data_top10 %>%
+  group_by(Origin.Country) %>%
+  summarise(TotalVisitors = sum(Visitors)) %>%
+  arrange(desc(TotalVisitors)) %>%
+  top_n(10, TotalVisitors) %>%
+  mutate(Origin.Country = as.character(Origin.Country))
+
+wordcloud(top_10_origin_countries_wordcloud$Origin.Country, top_10_origin_countries_wordcloud$TotalVisitors, min.freq = 1, max.words = 10, random.order = FALSE, rot.per = 0.5, use.r.layout = FALSE, main = "Top 10 Origin Countries of Visitors to Indonesia")
+
+```
+
+```{r}
+# Membuat daftar top 10 negara tujuan yang paling disukai oleh Indonesia
+
+top_10_destination_countries <- indonesia_data_top10 %>%
+  group_by(Destination.Country) %>%
+  summarise(TotalVisitors = sum(Visitors)) %>%
+  arrange(desc(TotalVisitors)) %>%
+  top_n(10, TotalVisitors) %>%
+  pull(Destination.Country)
+
+# Memfilter data panjang untuk top 10 negara tujuan yang paling disukai oleh Indonesia
+filtered_data <- indonesia_data_top10 %>%
+  filter(Destination.Country %in% top_10_destination_countries)
+
+# Menampilkan data yang telah difilter
+filtered_data
+```
+
+```{r}
+library(plotly)
+
+scatter_matrix_plot <- plot_ly(indonesia_data_top10, 
+                               type = 'splom', 
+                               dimensions = list(
+                                 list(label = 'Visitors', 
+                                      values = ~Visitors), 
+                                 list(label = 'Year', 
+                                      values = ~Year), 
+                                 list(label = 'Origin Country', 
+                                      values = ~Origin.Country)
+                               ), 
+                               marker = list(showscale = FALSE, 
+                                              opacity = 0.7, 
+                                              size = 5, 
+                                              color = ~Origin.Country, 
+                                              colorscale = 'Viridis')) %>%
+  layout(title = 'Scatter Matrix Plot of Top 10 Origin Countries')
+
+scatter_matrix_plot
+```
+
+```{r}
+#matriks scatter plot yang menunjukkan hubungan antara variabel Pengunjung, Tahun, dan Negara Asal pada dataset indonesia_data_top10. Plot dapat membantu mengidentifikasi tren atau pola apa pun dalam data, serta korelasi antar variabel.
+library(plotly)
+
+scatter_plot_matrix <- plot_ly(indonesia_data_top10, x = ~Visitors, y = ~Year, color = ~Origin.Country, type = 'scatter', mode = 'markers') %>%
+  layout(title = 'Scatter Plot Matrix of Visitors, Year, and Origin Country',
+         xaxis = list(title = 'Visitors'),
+         yaxis = list(title = 'Year'))
+
+scatter_plot_matrix
+```
+
+```{r}
+#top 3 visitors to Indonesia with percentages and creates a bar plot to show the results. The plot displays the origin country on the x-axis, the total visitors on the y-axis, and the percentage of visitors from each country as a label on the bar.
+# Calculate the top 3 visitors to Indonesia with percentages
+top_3_visitors <- indonesia_data_top10 %>%
+  group_by(Origin.Country) %>%
+  summarise(TotalVisitors = sum(Visitors)) %>%
+  arrange(desc(TotalVisitors)) %>%
+  top_n(3, TotalVisitors) %>%
+  mutate(Percentage = (TotalVisitors / sum(TotalVisitors)) * 100)
+
+# Create a bar plot to show the top 3 visitors to Indonesia with percentages
+
+```
+
+```{r}
+# Calculate the top 3 years with the most visitors to Indonesia
+top_3_years <- indonesia_data_top10 %>%
+  group_by(Year) %>%
+  summarise(TotalVisitors = sum(Visitors)) %>%
+  arrange(desc(TotalVisitors)) %>%
+  top_n(3, TotalVisitors)
+
+# Calculate the percentage of each year
+top_3_years$Percentage <- (top_3_years$TotalVisitors / sum(indonesia_data_top10$Visitors)) * 100
+
+# Create a bar plot to show the top 3 years with the most visitors to Indonesia
+library(ggplot2)
+
+```
+
+```{r}
+# Calculate the top 3 years with the least visitors to Indonesia
+top_3_years <- indonesia_data_top10 %>%
+  group_by(Year) %>%
+  summarise(TotalVisitors = sum(Visitors)) %>%
+  arrange(TotalVisitors) %>%
+  top_n(3, TotalVisitors)
+
+
+```
+
+```{r}
+# Calculate the top 3 years with the least visitors to Indonesia
+top_3_least_years <- indonesia_data_top10 %>%
+  group_by(Year) %>%
+  summarise(TotalVisitors = sum(Visitors)) %>%
+  arrange(TotalVisitors) %>%
+  top_n(3, TotalVisitors)
+
+# Create a bar plot to show the top 3 years with the least visitors to Indonesia
+
+```
+
+```{r}
+# bar plot that shows the top 5 origin countries with the least visitors to Indonesia.
+library(plotly)
+
+top_5_least_origin_countries <- indonesia_data_top10 %>%
+  group_by(Origin.Country) %>%
+  summarise(TotalVisitors = sum(Visitors)) %>%
+  arrange(TotalVisitors) %>%
+  top_n(5, TotalVisitors)
+
+bar_plot <- plot_ly(top_5_least_origin_countries, x = ~Origin.Country, y = ~TotalVisitors, type = 'bar', 
+                    marker = list(color = 'blue')) %>%
+  layout(title = 'Top 5 Origin Countries with the Least Visitors to Indonesia',
+         xaxis = list(title = 'Origin Country'),
+         yaxis = list(title = 'Total Visitors'))
+
+bar_plot
+```
+
+```{r}
+#bar plot that shows the top 5 origin countries with the least visitors to Indonesia.
+library(plotly)
+
+top_3_least_years <- indonesia_data_top10 %>%
+  group_by(Year) %>%
+  summarise(TotalVisitors = sum(Visitors)) %>%
+  arrange(TotalVisitors) %>%
+  top_n(3, TotalVisitors)
+
+bar_plot <- plot_ly(top_3_least_years, x = ~Year, y = ~TotalVisitors, type = 'bar', 
+                    marker = list(color = 'blue')) %>%
+  layout(title = 'Top 3 Years with the Least Visitors to Indonesia',
+         xaxis = list(title = 'Year'),
+         yaxis = list(title = 'Total Visitors'))
+
+bar_plot
+```
+
+```{r}
+# Process the data to get the top 10 origin countries and their percentages
+top_10_origin_countries <- indonesia_data_top10 %>%
+  group_by(Origin.Country) %>%
+  summarise(TotalVisitors = sum(Visitors)) %>%
+  arrange(desc(TotalVisitors)) %>%
+  top_n(10, TotalVisitors) %>%
+  mutate(Percentage = (TotalVisitors / sum(TotalVisitors)) * 100)
+
+# Create the pie chart using Plotly
+pie_chart <- plot_ly(
+  data = top_10_origin_countries,
+  labels = ~Origin.Country,
+  values = ~Percentage,
+  type = 'pie',
+  textinfo = 'label+percent',
+  insidetextorientation = 'radial'
+) %>%
+  layout(
+    title = 'Percentage of Visitors from Top 10 Origin Countries to Indonesia',
+    showlegend = TRUE
+  )
+
+# Display the plot
+pie_chart
+
+#Explanation: This pie chart displays the percentage distribution of visitors from the top 10 origin countries. It provides a quick view of the major sources of visitors.
+```
+
+
+```{r}
+# Data preparation and processing 
+data_impute2 <- data_impute[!data_impute$Origin.Country %in% c("Total Intra-ASEAN", "Total Country (World)", "Total EU-27"), ]
+data_impute3 <- separate(data_impute2, Origin.Country, into = c("Origin.Country", "Country.Code"), sep = "\\[|\\]")
+missing_values2 <- sapply(data_impute3, function(x) sum(is.na(x)))
+print("Missing values in each feature:")
+print(missing_values2)
+
+
+library(plotly)
+library(rjson)
+library(dplyr)
+library(countrycode)
+
+# Convert Country.Code to ISO3 
+data_impute3 <- data_impute3 %>%
+  mutate(ISO3 = countrycode(Country.Code, "iso2c", "iso3c"))
+
+# Check for any NA values in the ISO3 column
+missing_iso3 <- data_impute3 %>% filter(is.na(ISO3))
+print(missing_iso3)
+
+data_impute4 <- na.omit(data_impute3)
+
+
+data_aggregated <- data_impute4 %>%
+  mutate(Total_Visitors = X2015 + X2016 + X2017 + X2018 + X2019 + X2020) %>%
+  select(Destination.Country, Origin.Country, ISO3, Total_Visitors)
+
+# Create the interactive choropleth map
+map <- plot_ly(data = data_aggregated, 
+               type = 'choropleth', 
+               locations = ~ISO3, 
+               z = ~Total_Visitors, 
+               text = ~paste("Origin Country:", Origin.Country, "<br>",
+                             "Total Visitors:", Total_Visitors),
+               colorscale = "Viridis",
+               colorbar = list(title = "Total Visitors"))
+
+# Configure the layout
+map <- map %>%
+  layout(title = 'Total Visitors by Origin Country to Destination Country (2015-2020)',
+         geo = list(showframe = FALSE,
+                    showcoastlines = FALSE,
+                    projection = list(type = 'equirectangular')))
+
+# Display the map
+map
+
+
+```
+
+
+```{r}
+write.csv(data_impute4, "data.csv", row.names = FALSE)
+```
